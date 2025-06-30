@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>API Explorer - RAG Chatbot</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f8fafc; margin: 0; padding: 0; }
+        .container { max-width: 1100px; margin: 30px auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 8px #0001; padding: 32px; }
+        h1 { color: #2563eb; }
+        .api-list { margin: 0; padding: 0; list-style: none; }
+        .api-item { border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 18px; padding: 18px 22px; background: #f9fafb; }
+        .api-path { font-family: monospace; font-size: 16px; color: #2563eb; }
+        .api-method { display: inline-block; font-size: 13px; font-weight: bold; border-radius: 4px; padding: 2px 8px; margin-right: 8px; }
+        .GET { background: #d1fae5; color: #047857; }
+        .POST { background: #fee2e2; color: #b91c1c; }
+        .api-desc { color: #334155; margin: 8px 0 10px 0; font-size: 15px; }
+        .try-btn { background: #2563eb; color: #fff; border: none; border-radius: 5px; padding: 6px 16px; cursor: pointer; font-weight: bold; margin-top: 8px; }
+        .try-btn:disabled { background: #94a3b8; }
+        .try-form { margin-top: 10px; }
+        .try-form input, .try-form textarea { width: 100%; padding: 6px; margin-bottom: 8px; border-radius: 5px; border: 1px solid #e2e8f0; }
+        .try-result { background: #f1f5f9; border-radius: 6px; padding: 10px; margin-top: 8px; font-size: 14px; color: #334155; white-space: pre-wrap; }
+        .method-badge { margin-right: 8px; }
+        .mb-2 { margin-bottom: 12px; }
+        .flex { display: flex; align-items: center; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .small { font-size: 13px; color: #64748b; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>API Explorer - RAG Chatbot</h1>
+    <ul class="api-list" id="apiList"></ul>
+</div>
+<script>
+async function fetchApiList() {
+    const res = await fetch('/api-list');
+    const data = await res.json();
+    renderApiList(data.endpoints);
+}
+
+function renderApiList(endpoints) {
+    const ul = document.getElementById('apiList');
+    ul.innerHTML = endpoints.map((ep, idx) => `
+        <li class="api-item">
+            <div class="flex mb-2">
+                <span class="api-method ${ep.method}">${ep.method}</span>
+                <span class="api-path">${ep.path}</span>
+            </div>
+            <div class="api-desc">${ep.doc || '<i>Không có mô tả</i>'}</div>
+            <button class="try-btn" onclick="showTryForm(${idx})">Thử API</button>
+            <form class="try-form" id="tryForm${idx}" style="display:none" onsubmit="return tryApi(event, ${idx})">
+                <div id="params${idx}"></div>
+                <button type="submit" class="try-btn">Gửi</button>
+                <div class="try-result" id="result${idx}" style="display:none"></div>
+            </form>
+        </li>
+    `).join('');
+}
+
+function showTryForm(idx) {
+    document.querySelectorAll('.try-form').forEach(f => f.style.display = 'none');
+    document.getElementById('tryForm'+idx).style.display = '';
+    // Hiển thị input cho POST (body JSON)
+    const paramsDiv = document.getElementById('params'+idx);
+    const method = document.querySelectorAll('.api-method')[idx].textContent;
+    if (method === 'POST') {
+        paramsDiv.innerHTML = '<label>Body (JSON):</label><textarea rows="4" id="body'+idx+'"></textarea>';
+    } else {
+        paramsDiv.innerHTML = '';
+    }
+    document.getElementById('result'+idx).style.display = 'none';
+}
+
+async function tryApi(e, idx) {
+    e.preventDefault();
+    const endpoints = window._apiEndpoints;
+    const ep = endpoints[idx];
+    const resultDiv = document.getElementById('result'+idx);
+    resultDiv.style.display = 'block';
+    resultDiv.textContent = 'Đang gửi request...';
+    try {
+        let res;
+        if (ep.method === 'POST') {
+            let body = document.getElementById('body'+idx).value;
+            try { body = body ? JSON.parse(body) : {}; } catch { resultDiv.textContent = 'Body không phải JSON hợp lệ!'; return false; }
+            res = await fetch(ep.path, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+        } else {
+            res = await fetch(ep.path);
+        }
+        const text = await res.text();
+        resultDiv.textContent = `Status: ${res.status}\n` + text;
+    } catch (e) {
+        resultDiv.textContent = 'Lỗi: ' + e.message;
+    }
+    return false;
+}
+
+// Lấy danh sách endpoint từ backend
+fetch('/api-list').then(r=>r.json()).then(data=>{
+    window._apiEndpoints = data.endpoints;
+    renderApiList(data.endpoints);
+});
+</script>
+</body>
+</html> 

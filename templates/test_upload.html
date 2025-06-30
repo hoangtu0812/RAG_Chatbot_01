@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { margin-top: 20px; padding: 10px; border: 1px solid #ccc; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>Upload Test</h1>
+    
+    <input type="file" id="fileInput" accept=".txt,.pdf,.docx">
+    <button onclick="testUpload()">Test Upload</button>
+    
+    <div id="result"></div>
+    
+    <script>
+        async function testUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const resultDiv = document.getElementById('result');
+            
+            if (fileInput.files.length === 0) {
+                resultDiv.innerHTML = '<div class="result error">Please select a file first</div>';
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            console.log('File selected:', file.name, file.size);
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                console.log('Sending upload request...');
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                console.log('Response status:', response.status);
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            <h3>Upload Successful!</h3>
+                            <p>Status: ${response.status}</p>
+                            <p>Message: ${data.message}</p>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            <h3>Upload Failed!</h3>
+                            <p>Status: ${response.status}</p>
+                            <p>Error: ${data.error}</p>
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                console.error('Upload error:', error);
+                resultDiv.innerHTML = `<div class="result error">Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html> 

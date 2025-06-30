@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Chatbot</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-light: #3b82f6;
+            --background: #f8fafc;
+            --surface: #fff;
+            --surface-dark: #1e293b;
+            --text: #1e293b;
+            --text-light: #f1f5f9;
+            --user-bg: #e0e7ef;
+            --ai-bg: #2563eb;
+            --ai-bg-light: #3b82f6;
+            --border: #e2e8f0;
+            --shadow: 0 2px 12px #0001;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--background);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding: 24px 0;
+            display: flex;
+            gap: 24px;
+        }
+        .sidebar {
+            width: 250px;
+            background: var(--surface);
+            border-radius: 14px;
+            box-shadow: var(--shadow);
+            padding: 24px 20px 20px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            height: fit-content;
+        }
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            max-width: 1000px;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .title {
+            font-size: 26px;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        .theme-toggle {
+            background: none;
+            border: none;
+            font-size: 22px;
+            cursor: pointer;
+            color: var(--primary);
+            padding: 6px;
+            border-radius: 8px;
+        }
+        .chat-container {
+            flex: 1;
+            background: var(--surface);
+            border-radius: 14px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 500px;
+            max-width: 1000px;
+        }
+        .chat-messages {
+            flex: 1;
+            padding: 28px 36px 18px 36px;
+            overflow-y: auto;
+            background: var(--surface);
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            scroll-behavior: smooth;
+        }
+        .message {
+            display: flex;
+            align-items: flex-end;
+            gap: 12px;
+            max-width: 90%;
+        }
+        .message.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+        .message.ai {
+            align-self: flex-start;
+        }
+        .avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: var(--primary-light);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            box-shadow: 0 2px 8px #0002;
+            flex-shrink: 0;
+            aspect-ratio: 1/1;
+        }
+        .message.user .avatar {
+            background: var(--user-bg);
+            color: var(--primary);
+            border: 1.5px solid var(--primary);
+        }
+        .bubble {
+            padding: 16px 18px;
+            border-radius: 16px;
+            font-size: 16px;
+            line-height: 1.6;
+            box-shadow: 0 2px 8px #0001;
+            background: var(--user-bg);
+            color: var(--text);
+            word-break: break-word;
+            position: relative;
+        }
+        .message.user .bubble {
+            background: var(--user-bg);
+            color: var(--primary);
+        }
+        .message.ai .bubble {
+            background: var(--ai-bg);
+            color: #fff;
+        }
+        .sources {
+            font-size: 13px;
+            color: #c7d2fe;
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .sources .icon {
+            font-size: 15px;
+            color: #fff;
+        }
+        .chat-input-container {
+            padding: 18px 24px;
+            border-top: 1px solid var(--border);
+            background: var(--surface);
+        }
+        .chat-input-form {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .chat-input {
+            flex: 1;
+            padding: 14px 16px;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            background: var(--background);
+            color: var(--text);
+            resize: none;
+            min-height: 44px;
+            max-height: 120px;
+            font-family: inherit;
+            font-size: 16px;
+        }
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .send-button {
+            padding: 14px 28px;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 16px;
+            transition: background 0.2s;
+        }
+        .send-button:disabled {
+            background: #a5b4fc;
+            cursor: not-allowed;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: var(--primary);
+        }
+        .loading.show {
+            display: block;
+        }
+        .spinner {
+            border: 2px solid #e0e7ef;
+            border-top: 2px solid var(--primary);
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .file-input-container {
+            border: 2px dashed var(--border);
+            border-radius: 10px;
+            padding: 18px 10px 18px 10px;
+            text-align: center;
+            cursor: pointer;
+            margin-bottom: 10px;
+            background: var(--background);
+            transition: border-color 0.2s;
+        }
+        .file-input-container:hover {
+            border-color: var(--primary);
+        }
+        .file-input {
+            display: none;
+        }
+        .upload-text {
+            color: #64748b;
+            margin-bottom: 10px;
+            font-size: 15px;
+        }
+        .upload-button {
+            padding: 8px 22px;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 15px;
+            margin-top: 10px;
+            transition: background 0.2s;
+            display: block;
+            width: 100%;
+        }
+        .upload-button:disabled {
+            background: #a5b4fc;
+            cursor: not-allowed;
+        }
+        .file-input-container input[type="file"] {
+            display: block;
+            margin: 0 auto 8px auto;
+        }
+        .model-options {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 0;
+        }
+        .model-option {
+            flex: 1;
+            padding: 8px 0;
+            border: 1.5px solid var(--border);
+            border-radius: 7px;
+            background: var(--background);
+            color: var(--primary);
+            cursor: pointer;
+            text-align: center;
+            font-weight: 600;
+            font-size: 15px;
+            transition: background 0.2s, color 0.2s, border 0.2s;
+        }
+        .model-option.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+        .documents-list {
+            margin-top: 10px;
+        }
+        .documents-list h3 {
+            margin-bottom: 8px;
+            color: var(--primary);
+            font-size: 17px;
+        }
+        .document-item {
+            padding: 7px 10px;
+            background: var(--background);
+            border: 1.5px solid var(--border);
+            border-radius: 7px;
+            margin-bottom: 7px;
+            font-size: 14px;
+            color: var(--primary);
+            word-break: break-all;
+        }
+        @media (max-width: 900px) {
+            .container { flex-direction: column; padding: 0 0 24px 0; }
+            .sidebar { width: 100%; margin-bottom: 18px; }
+        }
+        @media (max-width: 600px) {
+            .container { padding: 0; }
+            .sidebar, .main-content, .chat-container { border-radius: 0; box-shadow: none; }
+            .chat-messages { padding: 14px 4px 10px 4px; }
+            .chat-input-container { padding: 10px 4px; }
+            .sidebar { padding: 14px 6px 10px 6px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="model-selector">
+                <label style="font-weight:600;">Chọn LLM:</label>
+                <div class="model-options" style="display:flex; gap:8px; margin-bottom:10px;">
+                    <div class="model-option active" data-model="gemini">Gemini</div>
+                    <div class="model-option" data-model="local">Local</div>
+                </div>
+                <div id="geminiModelSelectContainer" style="display:none; margin-top:10px;">
+                    <label for="geminiModelSelect" style="font-size:14px;">Gemini Model:</label>
+                    <select id="geminiModelSelect" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border);margin-top:4px;"></select>
+                </div>
+            </div>
+            <div class="file-upload">
+                <label style="font-weight:600;">Upload tài liệu:</label>
+                <div class="file-input-container" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-text">Click để upload PDF, DOCX, hoặc TXT</div>
+                    <input type="file" id="fileInput" class="file-input" accept=".pdf,.docx,.txt" multiple>
+                    <button class="upload-button" id="uploadButton" type="button">Upload</button>
+                </div>
+            </div>
+            <div class="documents-list">
+                <h3 style="margin-bottom:10px; color:var(--primary);">Tài liệu đã upload</h3>
+                <div id="documentsList">
+                    <div class="document-item">Chưa có tài liệu nào</div>
+                </div>
+            </div>
+        </div>
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="header">
+                <h1 class="title">RAG Chatbot</h1>
+                <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+            </div>
+            <div class="chat-container">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message ai">
+                        <div class="avatar">AI</div>
+                        <div class="bubble">Hello! I'm your RAG-powered chatbot. Upload some documents and ask me questions about them!</div>
+                    </div>
+                </div>
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <div id="aiTyping">AI đang trả lời...</div>
+                </div>
+                <div class="chat-input-container">
+                    <form class="chat-input-form" id="chatForm">
+                        <textarea class="chat-input" id="messageInput" placeholder="Nhập tin nhắn..." rows="1"></textarea>
+                        <button type="submit" class="send-button" id="sendButton">Gửi</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        let selectedModel = 'gemini';
+        let chatHistory = [];
+        function toggleTheme() {
+            const body = document.body;
+            const themeToggle = document.querySelector('.theme-toggle');
+            if (body.getAttribute('data-theme') === 'dark') {
+                body.removeAttribute('data-theme');
+                themeToggle.textContent = '🌙';
+                localStorage.setItem('theme', 'light');
+            } else {
+                body.setAttribute('data-theme', 'dark');
+                themeToggle.textContent = '☀️';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            document.body.setAttribute('data-theme', 'dark');
+            document.querySelector('.theme-toggle').textContent = '☀️';
+        }
+        document.querySelectorAll('.model-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.model-option').forEach(opt => opt.classList.remove('active'));
+                this.classList.add('active');
+                selectedModel = this.dataset.model;
+                if (selectedModel === 'gemini') {
+                    document.getElementById('geminiModelSelectContainer').style.display = '';
+                    loadGeminiModels();
+                } else {
+                    document.getElementById('geminiModelSelectContainer').style.display = 'none';
+                }
+            });
+        });
+        let selectedGeminiModel = '';
+        async function loadGeminiModels() {
+            const select = document.getElementById('geminiModelSelect');
+            select.innerHTML = '<option>Loading...</option>';
+            try {
+                const res = await fetch('/gemini-models');
+                const data = await res.json();
+                if (data.models && data.models.length > 0) {
+                    select.innerHTML = data.models.map(m => `<option value="${m}">${m}</option>`).join('');
+                    selectedGeminiModel = data.models[0];
+                } else {
+                    select.innerHTML = '<option>No models found</option>';
+                }
+            } catch (e) {
+                select.innerHTML = '<option>Error loading models</option>';
+            }
+        }
+        document.getElementById('geminiModelSelect').addEventListener('change', function() {
+            selectedGeminiModel = this.value;
+        });
+        document.getElementById('uploadButton').addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadFiles();
+        });
+        const chatForm = document.getElementById('chatForm');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const chatMessages = document.getElementById('chatMessages');
+        const loading = document.getElementById('loading');
+        const aiTyping = document.getElementById('aiTyping');
+        chatForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            sendChatMessage();
+        });
+        messageInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendChatMessage();
+            }
+        });
+        async function sendChatMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+            addMessage(message, 'user');
+            messageInput.value = '';
+            sendButton.disabled = true;
+            loading.classList.add('show');
+            aiTyping.textContent = 'AI đang trả lời...';
+            try {
+                const payload = {
+                    message: message,
+                    model_type: selectedModel
+                };
+                if (selectedModel === 'gemini') {
+                    payload.model_name = document.getElementById('geminiModelSelect').value;
+                }
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (data.error) {
+                    addMessage(`Error: ${data.error}`, 'ai');
+                } else {
+                    addMessage(data.response, 'ai', data.sources);
+                }
+            } catch (error) {
+                addMessage(`Error: ${error.message}`, 'ai');
+            } finally {
+                loading.classList.remove('show');
+                sendButton.disabled = false;
+                messageInput.focus();
+            }
+        }
+        function addMessage(content, sender, sources = null) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            const avatar = document.createElement('div');
+            avatar.className = 'avatar';
+            avatar.textContent = sender === 'user' ? 'U' : 'AI';
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.innerHTML = content;
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(bubble);
+            if (sources && sources.length > 0) {
+                const sourcesDiv = document.createElement('div');
+                sourcesDiv.className = 'sources';
+                sourcesDiv.innerHTML = `<span class="icon">📄</span> ${sources.map(s => `<span title="${s}">${s}</span>`).join(', ')}`;
+                messageDiv.appendChild(sourcesDiv);
+            }
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        async function uploadFiles() {
+            const fileInput = document.getElementById('fileInput');
+            const files = fileInput.files;
+            if (files.length === 0) {
+                showNotification('Vui lòng chọn file để upload', 'error');
+                return;
+            }
+            const uploadButton = document.querySelector('.upload-button');
+            const originalText = uploadButton.textContent;
+            uploadButton.textContent = 'Uploading...';
+            uploadButton.disabled = true;
+            try {
+                for (let file of files) {
+                    showNotification(`Uploading ${file.name}...`, 'info');
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    const response = await fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        showNotification(data.message, 'success');
+                        loadDocuments();
+                    } else {
+                        showNotification(`Failed to upload ${file.name}: ${data.error}`, 'error');
+                    }
+                }
+            } catch (error) {
+                showNotification(`Error uploading files: ${error.message}`, 'error');
+            } finally {
+                uploadButton.textContent = originalText;
+                uploadButton.disabled = false;
+                fileInput.value = '';
+            }
+        }
+        async function loadDocuments() {
+            try {
+                const response = await fetch('/documents');
+                const data = await response.json();
+                const documentsList = document.getElementById('documentsList');
+                if (data.documents && data.documents.length > 0) {
+                    documentsList.innerHTML = data.documents.map(doc => 
+                        `<div class="document-item">${doc.source}</div>`
+                    ).join('');
+                } else {
+                    documentsList.innerHTML = '<div class="document-item">Chưa có tài liệu nào</div>';
+                }
+            } catch (error) {
+                showNotification('Lỗi tải danh sách tài liệu', 'error');
+            }
+        }
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = type;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            setTimeout(() => {
+                notification.remove();
+            }, 4000);
+        }
+        messageInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+        loadDocuments();
+    </script>
+</body>
+</html> 

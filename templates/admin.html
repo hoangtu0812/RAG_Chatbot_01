@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard - RAG Chatbot</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f8fafc; margin: 0; padding: 0; }
+        .container { max-width: 1200px; margin: 30px auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 8px #0001; padding: 32px; }
+        h1 { color: #2563eb; }
+        h2 { margin-top: 32px; }
+        .section { margin-bottom: 32px; }
+        .btn { padding: 8px 18px; border-radius: 6px; border: none; background: #2563eb; color: #fff; font-weight: bold; cursor: pointer; margin-right: 8px; }
+        .btn.danger { background: #ef4444; }
+        .btn:disabled { background: #94a3b8; cursor: not-allowed; }
+        .table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        .table th, .table td { border: 1px solid #e2e8f0; padding: 8px; text-align: left; }
+        .table th { background: #f1f5f9; }
+        .chunk-preview { font-size: 13px; color: #64748b; max-width: 400px; white-space: pre-line; }
+        .meta { font-size: 12px; color: #64748b; }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        .info { color: #2563eb; }
+        .doc-list { margin: 0; padding: 0; list-style: none; }
+        .doc-list li { margin-bottom: 8px; }
+        .doc-actions { display: inline-block; margin-left: 8px; }
+        .flex { display: flex; align-items: center; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .mb-2 { margin-bottom: 12px; }
+        .mb-1 { margin-bottom: 6px; }
+        .scroll-x { overflow-x: auto; }
+        .modal-bg { display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.25); z-index:1000; }
+        .modal { background:#fff; border-radius:10px; max-width:600px; margin:80px auto; padding:28px 32px; box-shadow:0 4px 24px #0002; position:relative; }
+        .modal-close { position:absolute; top:12px; right:18px; font-size:22px; color:#888; cursor:pointer; }
+        .modal-content { white-space:pre-wrap; font-size:15px; color:#1e293b; margin-bottom:10px; }
+        .modal-meta { font-size:13px; color:#64748b; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Admin Dashboard - RAG Chatbot</h1>
+
+    <div class="section">
+        <div class="flex-between mb-2">
+            <h2>Quản lý Vector Database</h2>
+            <button class="btn danger" onclick="clearVectorstore()">Xóa toàn bộ Vectorstore</button>
+        </div>
+        <div id="vectorStatus" class="mb-2 info"></div>
+        <div class="scroll-x">
+            <table class="table" id="vectorTable">
+                <thead>
+                <tr>
+                    <th>#</th>
+                    <th>File nguồn</th>
+                    <th>Chunk Preview</th>
+                    <th>Metadata</th>
+                </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="flex-between mb-2">
+            <h2>Quản lý Tài liệu Upload</h2>
+            <button class="btn" onclick="loadDocuments()">Làm mới danh sách</button>
+        </div>
+        <ul class="doc-list" id="docList"></ul>
+    </div>
+
+    <div id="notify"></div>
+</div>
+<div id="modalBg" class="modal-bg">
+    <div class="modal">
+        <span class="modal-close" onclick="closeModal()">&times;</span>
+        <div class="modal-content" id="modalContent"></div>
+        <div class="modal-meta" id="modalMeta"></div>
+    </div>
+</div>
+<script>
+function showNotify(msg, type='info') {
+    const n = document.getElementById('notify');
+    n.innerHTML = `<div class="${type}">${msg}</div>`;
+    setTimeout(()=>{ n.innerHTML = ''; }, 4000);
+}
+
+// Thêm sự kiện click vào từng dòng để xem chi tiết chunk
+function addChunkRowClick() {
+    document.querySelectorAll('#vectorTable tbody tr').forEach(row => {
+        row.onclick = function() {
+            const idx = this.getAttribute('data-idx');
+            showChunkModal(idx);
+        }
+    });
+}
+
+// Xem toàn bộ vectorstore
+async function loadVectorDB() {
+    const table = document.getElementById('vectorTable').querySelector('tbody');
+    table.innerHTML = '<tr><td colspan="4">Đang tải...</td></tr>';
+    try {
+        const res = await fetch('/vector-debug');
+        const data = await res.json();
+        if (data.documents && data.documents.length > 0) {
+            table.innerHTML = data.documents.map((doc, i) => `
+                <tr data-idx="${i}">
+                    <td>${i+1}</td>
+                    <td>${doc.source}</td>
+                    <td class="chunk-preview">${doc.content_preview.replace(/\n/g, '<br>')}</td>
+                    <td class="meta">${JSON.stringify(doc.metadata)}</td>
+                </tr>
+            `).join('');
+            addChunkRowClick();
+            window._vectorChunks = data.documents;
+        } else {
+            table.innerHTML = '<tr><td colspan="4">Không có dữ liệu</td></tr>';
+        }
+    } catch (e) {
+        table.innerHTML = `<tr><td colspan="4" class="error">Lỗi tải dữ liệu: ${e.message}</td></tr>`;
+    }
+}
+
+// Xóa toàn bộ vectorstore
+async function clearVectorstore() {
+    if (!confirm('Bạn có chắc chắn muốn xóa toàn bộ vectorstore?')) return;
+    document.getElementById('vectorStatus').textContent = 'Đang xóa...';
+    try {
+        const res = await fetch('/clear-vectorstore', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            showNotify('Đã xóa vectorstore!', 'success');
+            loadVectorDB();
+        } else {
+            showNotify('Lỗi: ' + (data.error || 'Không rõ'), 'error');
+        }
+    } catch (e) {
+        showNotify('Lỗi: ' + e.message, 'error');
+    }
+    document.getElementById('vectorStatus').textContent = '';
+}
+
+// Quản lý tài liệu upload
+async function loadDocuments() {
+    const ul = document.getElementById('docList');
+    ul.innerHTML = '<li>Đang tải...</li>';
+    try {
+        const res = await fetch('/vector-debug');
+        const data = await res.json();
+        if (data.documents && data.documents.length > 0) {
+            // Gom nhóm theo source
+            const group = {};
+            data.documents.forEach(doc => {
+                if (!group[doc.source]) group[doc.source] = [];
+                group[doc.source].push(doc);
+            });
+            ul.innerHTML = Object.keys(group).map((src, idx) => `
+                <li>
+                    <b>${src}</b> <span class="meta">(${group[src].length} chunk)</span>
+                    <span class="doc-actions">
+                        <button class="btn danger" onclick="deleteDocument('${src}')">Xóa</button>
+                    </span>
+                </li>
+            `).join('');
+        } else {
+            ul.innerHTML = '<li>Không có tài liệu nào</li>';
+        }
+    } catch (e) {
+        ul.innerHTML = `<li class="error">Lỗi tải dữ liệu: ${e.message}</li>`;
+    }
+}
+
+// Xóa tài liệu theo source
+async function deleteDocument(source) {
+    if (!confirm('Xóa tất cả chunk của tài liệu này?')) return;
+    try {
+        const res = await fetch('/delete-document', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showNotify('Đã xóa tài liệu!', 'success');
+            loadDocuments();
+            loadVectorDB();
+        } else {
+            showNotify('Lỗi: ' + (data.error || 'Không rõ'), 'error');
+        }
+    } catch (e) {
+        showNotify('Lỗi: ' + e.message, 'error');
+    }
+}
+
+function showChunkModal(idx) {
+    const doc = window._vectorChunks[idx];
+    document.getElementById('modalContent').textContent = doc.content || doc.content_preview;
+    document.getElementById('modalMeta').textContent = JSON.stringify(doc.metadata, null, 2);
+    document.getElementById('modalBg').style.display = 'block';
+}
+function closeModal() {
+    document.getElementById('modalBg').style.display = 'none';
+}
+
+// Khởi động
+loadVectorDB();
+loadDocuments();
+</script>
+</body>
+</html> 
