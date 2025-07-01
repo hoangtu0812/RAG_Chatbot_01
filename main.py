@@ -7,11 +7,12 @@ import os
 import json
 import logging
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, send_from_directory
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 import shutil
 import re
+import requests
 
 from backend.llm_provider import LLMProvider
 from backend.document_loader import DocumentLoader
@@ -30,7 +31,7 @@ app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-here')
 # Configuration
 UPLOAD_FOLDER = 'data/uploads'
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx'}
-MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
+MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
@@ -82,6 +83,10 @@ def upload_file():
         # Save file
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+        # Nếu file trùng tên, xóa chunk cũ trong vector store trước khi thêm mới
+        vector_store.delete_document(filename)
+
         file.save(filepath)
         logger.info(f"File saved to: {filepath}")
         
@@ -150,7 +155,7 @@ def chat():
         chat_history = session.get('chat_history', [])[-10:]
         # Generate response using selected LLM, truyền history
         if model_type == 'local':
-            response = llm_provider.generate_local_response(user_message, relevant_docs, chat_history=chat_history)
+            response = llm_provider.generate_local_response(user_message, relevant_docs, chat_history=chat_history, model_name=data.get('model_name'))
         else:
             response = llm_provider.generate_gemini_response(user_message, relevant_docs, model_name=model_name, chat_history=chat_history)
         # Store chat history in session
@@ -291,6 +296,63 @@ def api_list():
             })
     endpoints = sorted(endpoints, key=lambda x: (x['path'], x['method']))
     return jsonify({'endpoints': endpoints})
+
+@app.route('/local-models', methods=['GET'])
+def local_models():
+    """Get available local LLM models from LM Studio API"""
+    try:
+        lmstudio_url = os.getenv('LOCAL_LLM_ENDPOINT', 'http://127.0.0.1:1234/v1/chat/completions')
+        # Lấy host từ endpoint
+        if '/v1/chat/completions' in lmstudio_url:
+            base_url = lmstudio_url.split('/v1/chat/completions')[0]
+        else:
+            base_url = 'http://127.0.0.1:1234'
+        models_url = base_url + '/v1/models'
+        resp = requests.get(models_url, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            # LM Studio trả về {'data': [ {id: model_name, ...}, ... ]}
+            model_list = [m['id'] for m in data.get('data', [])]
+            return jsonify({'models': model_list})
+        else:
+            return jsonify({'error': f'LM Studio returned status {resp.status_code}'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/vectorstore-status', methods=['GET'])
+def vectorstore_status():
+    """Get vectorstore and model status for UI"""
+    try:
+        # DB status
+        stats = vector_store.get_stats()
+        db_connected = not vector_store.is_empty() or stats.get('total_documents', 0) >= 0
+        # Model status
+        gemini_ok = llm_provider.gemini_api_key is not None
+        # Test local LLM connection (optional, fast check)
+        local_ok = False
+        try:
+            import requests
+            lmstudio_url = os.getenv('LOCAL_LLM_ENDPOINT', 'http://127.0.0.1:1234/v1/chat/completions')
+            resp = requests.get(lmstudio_url.replace('/v1/chat/completions','/v1/models'), timeout=2)
+            local_ok = resp.status_code == 200
+        except Exception:
+            local_ok = False
+        return jsonify({
+            'db_connected': db_connected,
+            'total_documents': stats.get('unique_sources', 0),
+            'total_chunks': stats.get('total_documents', 0),
+            'unique_sources': stats.get('unique_sources', 0),
+            'model_status': {
+                'gemini': gemini_ok,
+                'local': local_ok
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/logoBSR.png')
+def serve_logo():
+    return send_from_directory('.', 'logoBSR.png')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000) 

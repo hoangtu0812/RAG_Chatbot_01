@@ -85,7 +85,7 @@ class LLMProvider:
         except Exception as e:
             return f"Error generating Gemini response: {str(e)}"
     
-    def generate_local_response(self, user_message: str, relevant_docs: List[Document], chat_history=None) -> str:
+    def generate_local_response(self, user_message: str, relevant_docs: List[Document], chat_history=None, model_name=None) -> str:
         """Generate response using local LLM via LM Studio, default to Vietnamese"""
         try:
             context = self._prepare_context(relevant_docs)
@@ -96,8 +96,9 @@ class LLMProvider:
                     history_str += f"Người dùng: {turn['user']}\n---\n"
             prompt = f"""Bạn là một trợ lý AI hữu ích, trả lời bằng tiếng Việt.\n\nDưới đây là lịch sử hội thoại gần nhất giữa bạn và người dùng (nếu có), tiếp theo là ngữ cảnh tài liệu.\n\nLưu ý: KHÔNG lặp lại nội dung trả lời trước, chỉ trả lời cho câu hỏi hiện tại. Nếu thông tin nằm rải rác ở nhiều đoạn, hãy tổng hợp lại. Nếu có thể, hãy trình bày dạng danh sách rõ ràng, dễ đọc.\n\nLịch sử hội thoại (chỉ dùng để tham khảo, KHÔNG lặp lại nội dung trả lời trước):\n{history_str}\n==============================\nNgữ cảnh tài liệu:\n{context}\n==============================\nCâu hỏi của người dùng: {user_message}\n\nTrả lời:"""
             print("\n===== PROMPT GỬI ĐẾN LOCAL LLM =====\n" + prompt + "\n===============================\n")
+            model_to_use = model_name if model_name else self.local_model
             payload = {
-                "model": self.local_model,
+                "model": model_to_use,
                 "messages": [
                     {"role": "system", "content": "Bạn là một trợ lý AI hữu ích, trả lời bằng tiếng Việt."},
                     {"role": "user", "content": prompt}

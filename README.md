@@ -206,3 +206,51 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [Chroma](https://www.trychroma.com/) for vector storage
 - [LM Studio](https://lmstudio.ai/) for local LLM hosting
 - [Google Gemini](https://ai.google.dev/) for cloud LLM access 
+
+
+
+## Cách hoạt động của web app
+
+### 1. Upload và xử lý tài liệu
+- Người dùng upload file PDF, DOCX, TXT qua giao diện web.
+- Backend lưu file vào thư mục `data/uploads/`.
+- File được đọc và chia nhỏ thành các chunk (theo cấu hình chunk_size, chunk_overlap).
+
+### 2. Sinh embedding và lưu vectorstore
+- Mỗi chunk được chuyển thành vector embedding bằng model (ví dụ: `intfloat/multilingual-e5-large`).
+- Các embedding và metadata (tên file, vị trí, loại file, ...) được lưu vào vector database (ChromaDB) trong `data/vectorstore/`.
+
+### 3. Truy vấn và sinh câu trả lời
+- Khi người dùng gửi câu hỏi:
+  1. Backend lấy 12 chunk liên quan nhất (theo embedding) từ vectorstore.
+  2. Tự động tìm thêm các chunk chứa từ khóa đặc biệt trong câu hỏi (ví dụ: "208HV", "NMLD") để ghép vào context.
+  3. Lấy 10 lượt hội thoại gần nhất từ session để truyền vào prompt.
+  4. Ghép context (có cắt chunk tối đa 2000 ký tự), lịch sử hội thoại, và câu hỏi thành prompt.
+  5. Gửi prompt này lên LLM (Gemini hoặc local LLM qua LM Studio).
+  6. Nhận câu trả lời, format HTML đẹp.
+  7. Trả về frontend cùng danh sách nguồn (file) duy nhất.
+
+### 4. Hiển thị và quản lý trên frontend
+- Giao diện chat hiện đại, hỗ trợ:
+  - Gửi tin nhắn bằng Enter, xuống dòng bằng Shift+Enter.
+  - Chọn LLM, model Gemini động.
+  - Upload tài liệu, xem danh sách tài liệu đã upload.
+  - Hiển thị lịch sử hội thoại, nguồn tài liệu liên quan.
+- Trang admin:
+  - Xem toàn bộ chunk trong vectorstore, click để xem chi tiết nội dung và metadata.
+  - Xóa toàn bộ vectorstore hoặc từng tài liệu.
+  - Xem API docs, thử API trực tiếp.
+
+### 5. API và quản trị
+- Có trang API Explorer (`/api-docs`) tự động liệt kê và cho phép thử các endpoint.
+- Các API chính: upload, chat, lấy danh sách tài liệu, debug vectorstore, xóa vectorstore, xóa tài liệu, lấy lịch sử chat, ...
+
+### 6. Lịch sử hội thoại và session
+- Lịch sử hội thoại được lưu trong session Flask (cookie).
+- Khi refresh hoặc đổi session, lịch sử sẽ bị xóa.
+- Khi gửi câu hỏi, 10 lượt hội thoại gần nhất sẽ được truyền vào prompt để giữ ngữ cảnh.
+
+### 7. Tối ưu và bảo trì
+- Có thể đổi model embedding, chunk_size, chunk_overlap trong code/config.
+- Có thể xem/log prompt gửi lên LLM để debug.
+- Có thể mở rộng thêm các chức năng quản trị, tìm kiếm, phân quyền, ...
