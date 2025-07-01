@@ -48,7 +48,44 @@ RAG_ChatBot_01/
 └── README.md
 ```
 
+## UI/UX Highlights
+- **Modern chat bubbles**: Wide, readable, responsive, source files shown below each answer
+- **Progress bar**: Shows both upload and chunking progress, with cancel/continue on page close
+- **Sidebar**: LLM/model selection, DB/model status, document/chunk count, clear all
+- **Admin dashboard**: View/delete vectorstore, see all chunks, chunk details, delete by document
+- **API Explorer**: Live API docs and testing
+- **Dark mode**: Toggle with one click
+- **Company logo**: Sidebar and AI avatar
+- **Vietnamese default answers**: Optimized for Vietnamese context
+
+### UI Screenshots (add your own images in docs/)
+
+```markdown
+![Chat UI](docs/ui_chat.png)
+![Sidebar](docs/sidebar.png)
+![Admin Dashboard](docs/admin_dashboard.png)
+![API Explorer](docs/api_explorer.png)
+```
+
+---
+
 ## How it works (Pipeline)
+
+### Pipeline Diagram (Mermaid)
+
+```mermaid
+graph TD
+    A[User Uploads File] --> B[Backend: Save & Chunk]
+    B --> C[Embedding Model]
+    C --> D[Chroma Vectorstore]
+    E[User Asks Question] --> F[Retrieve Relevant Chunks]
+    F --> G[Build Prompt]
+    G --> H[LLM Gemini/Local]
+    H --> I[Response + Sources]
+    I --> J[Frontend: Display Chat + Sources]
+```
+
+---
 
 ### 1. Upload & Process Documents
 - User uploads PDF, DOCX, or TXT files via the web UI.
@@ -136,16 +173,6 @@ RAG_ChatBot_01/
 - `GET /vectorstore-status` - Get DB/model status, doc/chunk count
 - `GET /history` - Get chat history
 - `POST /clear-history` - Clear chat history
-
-## UI/UX Highlights
-- **Modern chat bubbles**: Wide, readable, responsive, source files shown below each answer
-- **Progress bar**: Shows both upload and chunking progress, with cancel/continue on page close
-- **Sidebar**: LLM/model selection, DB/model status, document/chunk count, clear all
-- **Admin dashboard**: View/delete vectorstore, see all chunks, chunk details, delete by document
-- **API Explorer**: Live API docs and testing
-- **Dark mode**: Toggle with one click
-- **Company logo**: Sidebar and AI avatar
-- **Vietnamese default answers**: Optimized for Vietnamese context
 
 ## Development & Customization
 - Add new LLM: Extend `backend/llm_provider.py`
