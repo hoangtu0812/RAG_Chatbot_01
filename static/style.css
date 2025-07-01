@@ -547,4 +547,33 @@ body {
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+.upload-progress {
+    width: 100%;
+    background: #e5e7eb;
+    border-radius: 8px;
+    height: 18px;
+    margin-bottom: 10px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 1px 4px #0001;
+}
+.upload-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #2563eb 60%, #60a5fa 100%);
+    width: 0%;
+    border-radius: 8px 0 0 8px;
+    transition: width 0.2s;
+}
+.upload-progress-label {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    font-size: 13px;
+    color: #fff;
+    font-weight: 600;
+    line-height: 18px;
+    text-shadow: 0 1px 2px #0005;
 } 

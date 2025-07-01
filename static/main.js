@@ -147,41 +147,82 @@ async function uploadFiles() {
         showNotification('Vui lòng chọn file để upload', 'error');
         return;
     }
-    
     const uploadButton = document.querySelector('.upload-button');
     const originalText = uploadButton.textContent;
+    const progressContainer = document.getElementById('uploadProgressContainer');
+    const progressBar = document.getElementById('uploadProgressBar');
+    const progressLabel = document.getElementById('uploadProgressLabel');
+    let uploading = true;
+    window.onbeforeunload = function(e) {
+        if (uploading) {
+            e.preventDefault();
+            e.returnValue = 'Tải lên đang diễn ra. Bạn có muốn dừng lại không?';
+            return e.returnValue;
+        }
+    };
+    progressContainer.style.display = '';
+    progressBar.style.width = '0%';
+    progressLabel.textContent = '0%';
     uploadButton.textContent = 'Uploading...';
     uploadButton.disabled = true;
-    
     try {
         for (let file of files) {
-            // Check file size (50MB = 50 * 1024 * 1024 bytes)
             const maxSize = 50 * 1024 * 1024; // 50MB
             if (file.size > maxSize) {
                 showNotification(`File ${file.name} quá lớn (${(file.size / 1024 / 1024).toFixed(1)}MB). Dung lượng tối đa: 50MB`, 'error');
                 continue;
             }
-            
             showNotification(`Uploading ${file.name}...`, 'info');
             const formData = new FormData();
             formData.append('file', file);
-            
-            const response = await fetch('/upload', {
-                method: 'POST',
-                body: formData
+            await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/upload', true);
+                xhr.upload.onprogress = function(e) {
+                    if (e.lengthComputable) {
+                        const percent = Math.round((e.loaded / e.total) * 100);
+                        progressBar.style.width = percent + '%';
+                        progressLabel.textContent = percent + '%';
+                    }
+                };
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        try {
+                            const data = JSON.parse(xhr.responseText);
+                            if (data.success) {
+                                showNotification(data.message, 'success');
+                                loadDocuments();
+                                resolve();
+                            } else {
+                                showNotification(`Failed to upload ${file.name}: ${data.error}`, 'error');
+                                resolve();
+                            }
+                        } catch (err) {
+                            showNotification(`Lỗi upload: ${xhr.responseText}`, 'error');
+                            resolve();
+                        }
+                    } else {
+                        showNotification(`Failed to upload ${file.name}: Upload failed: ${xhr.status} ${xhr.statusText}`, 'error');
+                        resolve();
+                    }
+                };
+                xhr.onerror = function() {
+                    showNotification(`Failed to upload ${file.name}: Network error`, 'error');
+                    resolve();
+                };
+                xhr.send(formData);
             });
-            const data = await response.json();
-            
-            if (data.success) {
-                showNotification(data.message, 'success');
-                loadDocuments();
-            } else {
-                showNotification(`Failed to upload ${file.name}: ${data.error}`, 'error');
-            }
         }
     } catch (error) {
         showNotification(`Error uploading files: ${error.message}`, 'error');
     } finally {
+        uploading = false;
+        window.onbeforeunload = null;
+        progressBar.style.width = '100%';
+        progressLabel.textContent = '100%';
+        setTimeout(() => {
+            progressContainer.style.display = 'none';
+        }, 800);
         uploadButton.textContent = originalText;
         uploadButton.disabled = false;
         fileInput.value = '';

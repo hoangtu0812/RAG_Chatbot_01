@@ -43,6 +43,10 @@
                 <div class="file-input-container" id="fileInputContainer">
                     <div class="upload-text">Kéo thả hoặc click để upload PDF, DOCX, TXT</div>
                     <div class="upload-info">Dung lượng tối đa: 50MB/file</div>
+                    <div class="upload-progress" id="uploadProgressContainer" style="display:none;">
+                        <div class="upload-progress-bar" id="uploadProgressBar"></div>
+                        <div class="upload-progress-label" id="uploadProgressLabel">0%</div>
+                    </div>
                     <input type="file" id="fileInput" class="file-input" accept=".pdf,.docx,.txt" multiple>
                     <button class="upload-button" id="uploadButton" type="button">Upload</button>
                 </div>
