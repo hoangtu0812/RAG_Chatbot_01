@@ -126,18 +126,62 @@ function addMessage(content, sender, sources = null) {
     bubble.className = 'bubble';
     bubble.innerHTML = content;
     
-    messageDiv.appendChild(avatar);
-    messageDiv.appendChild(bubble);
-    
     if (sources && sources.length > 0) {
         const sourcesDiv = document.createElement('div');
         sourcesDiv.className = 'sources';
         sourcesDiv.innerHTML = `<span class="icon">📄</span> ${sources.map(s => `<span title="${s}">${s}</span>`).join(', ')}`;
-        messageDiv.appendChild(sourcesDiv);
+        bubble.appendChild(sourcesDiv);
     }
+    
+    messageDiv.appendChild(avatar);
+    messageDiv.appendChild(bubble);
     
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+async function pollChunkingProgress(doc_id) {
+    const progressContainer = document.getElementById('uploadProgressContainer');
+    const progressBar = document.getElementById('uploadProgressBar');
+    const progressLabel = document.getElementById('uploadProgressLabel');
+    progressContainer.style.display = '';
+    let polling = true;
+    window.onbeforeunload = function(e) {
+        if (polling) {
+            e.preventDefault();
+            e.returnValue = 'Tài liệu đang được xử lý. Bạn có muốn dừng lại không?';
+            return e.returnValue;
+        }
+    };
+    while (polling) {
+        try {
+            const res = await fetch(`/processing-status?doc_id=${doc_id}`);
+            const data = await res.json();
+            const percent = Math.round((data.progress || 0) * 100);
+            progressBar.style.width = percent + '%';
+            progressLabel.textContent = percent + '%';
+            if (data.status === 'done' || percent >= 100) {
+                polling = false;
+                window.onbeforeunload = null;
+                progressBar.style.width = '100%';
+                progressLabel.textContent = '100%';
+                setTimeout(() => { progressContainer.style.display = 'none'; }, 800);
+                showNotification('Xử lý tài liệu thành công!', 'success');
+                loadDocuments();
+                break;
+            }
+            if (data.status === 'error') {
+                polling = false;
+                window.onbeforeunload = null;
+                showNotification('Lỗi xử lý tài liệu: ' + (data.error || 'Unknown'), 'error');
+                break;
+            }
+        } catch (e) {
+            showNotification('Lỗi kết nối khi kiểm tra tiến trình xử lý.', 'error');
+            break;
+        }
+        await new Promise(r => setTimeout(r, 1000));
+    }
 }
 
 async function uploadFiles() {
@@ -191,7 +235,11 @@ async function uploadFiles() {
                             const data = JSON.parse(xhr.responseText);
                             if (data.success) {
                                 showNotification(data.message, 'success');
-                                loadDocuments();
+                                if (data.doc_id && data.processing) {
+                                    pollChunkingProgress(data.doc_id);
+                                } else {
+                                    loadDocuments();
+                                }
                                 resolve();
                             } else {
                                 showNotification(`Failed to upload ${file.name}: ${data.error}`, 'error');
@@ -218,11 +266,6 @@ async function uploadFiles() {
     } finally {
         uploading = false;
         window.onbeforeunload = null;
-        progressBar.style.width = '100%';
-        progressLabel.textContent = '100%';
-        setTimeout(() => {
-            progressContainer.style.display = 'none';
-        }, 800);
         uploadButton.textContent = originalText;
         uploadButton.disabled = false;
         fileInput.value = '';

@@ -13,6 +13,9 @@ from dotenv import load_dotenv
 import shutil
 import re
 import requests
+import threading
+import time
+import uuid
 
 from backend.llm_provider import LLMProvider
 from backend.document_loader import DocumentLoader
@@ -44,6 +47,8 @@ vector_store = VectorStore()
 document_loader = DocumentLoader()
 llm_provider = LLMProvider()
 
+processing_status = {}  # doc_id: {"progress": float, "status": str, "error": str}
+
 def allowed_file(filename):
     """Check if file extension is allowed"""
     return '.' in filename and \
@@ -58,6 +63,18 @@ def index():
 def test():
     """Test upload page"""
     return render_template('test_upload.html')
+
+def process_document(doc_id, file_path):
+    try:
+        total_chunks = 100  # Giả lập, thực tế là số chunk thực tế
+        for i in range(total_chunks):
+            time.sleep(0.05)  # Giả lập thời gian xử lý mỗi chunk
+            processing_status[doc_id]['progress'] = (i + 1) / total_chunks
+        processing_status[doc_id]['progress'] = 1.0
+        processing_status[doc_id]['status'] = 'done'
+    except Exception as e:
+        processing_status[doc_id]['status'] = 'error'
+        processing_status[doc_id]['error'] = str(e)
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -103,10 +120,15 @@ def upload_file():
             
             if success:
                 logger.info("Documents added to vector store successfully")
+                doc_id = str(uuid.uuid4())
+                processing_status[doc_id] = {"progress": 0.0, "status": "processing"}
+                threading.Thread(target=process_document, args=(doc_id, filepath)).start()
                 return jsonify({
                     'success': True,
                     'message': f'File {filename} uploaded and processed successfully ({len(documents)} chunks)',
-                    'filename': filename
+                    'filename': filename,
+                    'doc_id': doc_id,
+                    'processing': True
                 })
             else:
                 logger.error("Failed to add documents to vector store")
@@ -118,6 +140,14 @@ def upload_file():
     except Exception as e:
         logger.error(f"Upload error: {str(e)}", exc_info=True)
         return jsonify({'error': f'Upload failed: {str(e)}'}), 500
+
+@app.route('/processing-status')
+def processing_status_api():
+    doc_id = request.args.get('doc_id')
+    status = processing_status.get(doc_id)
+    if not status:
+        return jsonify({"progress": 1.0, "status": "done"})
+    return jsonify(status)
 
 @app.route('/chat', methods=['POST'])
 def chat():

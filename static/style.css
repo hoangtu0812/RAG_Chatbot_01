@@ -366,10 +366,20 @@ body {
 .sources {
     font-size: 13px;
     color: #c7d2fe;
-    margin-top: 8px;
+    margin-top: 12px;
     display: flex;
     align-items: center;
     gap: 6px;
+    flex-wrap: wrap;
+    word-break: break-all;
+    opacity: 0.85;
+}
+.bubble .sources {
+    margin-left: 0;
+    margin-right: 0;
+    padding: 0;
+    background: none;
+    box-shadow: none;
 }
 .sources .icon {
     font-size: 15px;
