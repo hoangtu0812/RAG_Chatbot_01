@@ -9,205 +9,165 @@ A modern web-based chatbot using Retrieval-Augmented Generation (RAG) architectu
 - 🧠 **Multiple LLM Providers**: 
   - Google Gemini (Cloud)
   - Local models via LM Studio (phi-2, Gemma, etc.)
-- 🎨 **Modern UI**: Clean, responsive interface with dark mode support
+- 🎨 **Modern UI**: Clean, responsive interface with dark mode support, beautiful chat bubbles, avatars, typing status, and real-time progress
 - 📊 **Vector Storage**: Chroma vector store for efficient document retrieval
 - 🔍 **Document Management**: Upload, view, and manage your knowledge base
+- 🛠️ **Admin Dashboard**: View/delete vectorstore, manage uploads, view chunk details
+- 🧩 **API Explorer**: Interactive API docs and testing
+- 🌏 **Vietnamese default answers**: Optimized for Vietnamese context
+- 📝 **Prompt logging, source deduplication, multi-chunk synthesis**
 
-## Architecture
+## Project Structure
 
 ```
 RAG_ChatBot_01/
-├── main.py                 # Flask application entry point
+├── main.py                 # Flask application entry point, all routes
 ├── requirements.txt        # Python dependencies
 ├── env.example            # Environment variables template
+├── config.py               # App configuration
 ├── backend/
 │   ├── __init__.py
-│   ├── llm_provider.py    # LLM provider management
-│   ├── document_loader.py # Document processing
-│   └── vector_store.py    # Vector store operations
+│   ├── llm_provider.py    # LLM provider management (Gemini, Local, ...)
+│   ├── document_loader.py # Document processing, chunking, file parsing
+│   └── vector_store.py    # Vector store operations (ChromaDB)
 ├── templates/
-│   └── index.html         # Web interface
-└── data/
-    ├── uploads/           # Uploaded files
-    └── vectorstore/       # Chroma vector store
+│   ├── index.html         # Main chat UI
+│   ├── admin.html         # Admin dashboard (view/delete DB, chunk details)
+│   ├── api_docs.html      # API Explorer (Swagger-like)
+│   └── test_upload.html   # (Optional) Test upload UI
+├── static/
+│   ├── style.css          # All CSS (modern, responsive, dark mode)
+│   └── main.js            # All JS (chat, upload, progress, admin, ...)
+├── data/
+│   ├── uploads/           # Uploaded files
+│   ├── vectorstore/       # Chroma vector store (persisted DB)
+│   └── sample/            # Sample documents for testing
+│       ├── ai_technologies.txt
+│       └── sample_document.txt
+├── logoBSR.png            # Company logo (used in sidebar, AI avatar)
+└── README.md
 ```
 
-## Installation
+## How it works (Pipeline)
+
+### 1. Upload & Process Documents
+- User uploads PDF, DOCX, or TXT files via the web UI.
+- Backend saves files to `data/uploads/`.
+- Each file is parsed and split into text chunks (configurable chunk size/overlap).
+
+### 2. Embedding & Vectorstore
+- Each chunk is embedded using a model (e.g. `intfloat/multilingual-e5-large`).
+- Embeddings + metadata (file name, position, ...) are stored in ChromaDB (`data/vectorstore/`).
+
+### 3. Chat & Retrieval
+- User sends a question via chat UI.
+- Backend retrieves top relevant chunks (semantic search) from vectorstore.
+- Special keyword chunks are auto-merged for context.
+- Last 10 chat turns are included for context.
+- Prompt is constructed (context + history + question) and sent to LLM (Gemini or Local).
+- LLM response is returned, formatted, and sources are deduplicated.
+
+### 4. Frontend Display & Management
+- Modern chat UI: chat bubbles, avatars, typing status, Enter to send, Shift+Enter for newline.
+- Upload progress bar (with chunking progress), cancel/continue on page close.
+- Sidebar: LLM/model selection, document/chunk count, DB/model status, clear all button.
+- Admin dashboard: view/delete vectorstore, see all chunks, chunk details, delete by document.
+- API Explorer: interactive docs and live API testing.
+
+### 5. API & Admin
+- `/api-docs`: API Explorer (auto-generated docs, live test)
+- `/admin`: Admin dashboard (view/delete DB, chunk details)
+- Main APIs: upload, chat, documents, vectorstore status, clear vectorstore, delete document, chat history, ...
+
+### 6. Session & History
+- Chat history is stored in Flask session (cookie-based, per user).
+- Last 10 turns are used for context in prompt.
+- History is cleared on refresh or new session.
+
+## Sample Data
+- Sample files in `data/sample/` for quick testing.
+- You can upload these to see how the system works.
+
+## Installation & Usage
 
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
    cd RAG_ChatBot_01
    ```
-
 2. **Create virtual environment**
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
-
 3. **Install dependencies**
    ```bash
    pip install -r requirements.txt
    ```
-
 4. **Set up environment variables**
    ```bash
    cp env.example .env
    # Edit .env with your API keys and configuration
    ```
-
-## Configuration
-
-### Environment Variables
-
-Create a `.env` file with the following variables:
-
-```env
-# Flask Configuration
-SECRET_KEY=your-secret-key-here
-FLASK_ENV=development
-
-# Google Gemini API (Optional)
-GOOGLE_API_KEY=your-google-api-key-here
-
-# Local LLM Configuration (Optional)
-LOCAL_LLM_ENDPOINT=http://localhost:1234/v1/chat/completions
-LOCAL_MODEL_NAME=phi-2
-
-# Vector Store Configuration
-VECTOR_STORE_PATH=data/vectorstore
-
-# Upload Configuration
-MAX_FILE_SIZE=16777216
-UPLOAD_FOLDER=data/uploads
-```
-
-### LLM Setup
-
-#### Google Gemini
-1. Get your API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Add it to your `.env` file
-
-#### Local LLM (LM Studio)
-1. Download and install [LM Studio](https://lmstudio.ai/)
-2. Load a model (e.g., phi-2, Gemma-2b)
-3. Start the local server (usually runs on `http://localhost:1234`)
-4. Configure the endpoint in your `.env` file
-
-## Usage
-
-1. **Start the application**
+5. **Start the application**
    ```bash
    python main.py
    ```
+6. **Open your browser**
+   - Go to `http://localhost:5000`
 
-2. **Open your browser**
-   Navigate to `http://localhost:5000`
+## Configuration
 
-3. **Upload documents**
-   - Click the upload area in the sidebar
-   - Select PDF, DOCX, or TXT files
-   - Documents will be processed and added to the vector store
+- All config via `.env` or `config.py` (see `env.example` for all options)
+- Key options:
+  - `GOOGLE_API_KEY`: Gemini API key
+  - `LOCAL_LLM_ENDPOINT`: LM Studio endpoint
+  - `VECTOR_STORE_PATH`: Path to ChromaDB
+  - `UPLOAD_FOLDER`: Where uploads are stored
+  - `MAX_FILE_SIZE`: Max upload size (default 50MB)
 
-4. **Start chatting**
-   - Choose your preferred LLM (Gemini or Local)
-   - Ask questions about your uploaded documents
-   - The chatbot will retrieve relevant context and generate responses
-
-## API Endpoints
-
-- `GET /` - Main application page
-- `POST /upload` - Upload and process documents
-- `POST /chat` - Send chat messages
-- `GET /documents` - Get list of uploaded documents
+## API Endpoints (Main)
+- `GET /` - Main chat UI
+- `POST /upload` - Upload and process documents (returns doc_id, triggers chunking)
+- `GET /processing-status?doc_id=...` - Get chunking progress
+- `POST /chat` - Chat with RAG bot
+- `GET /documents` - List uploaded documents
+- `POST /clear-vectorstore` - Delete all vectorstore data
+- `GET /vectorstore-status` - Get DB/model status, doc/chunk count
 - `GET /history` - Get chat history
 - `POST /clear-history` - Clear chat history
 
-## Features in Detail
+## UI/UX Highlights
+- **Modern chat bubbles**: Wide, readable, responsive, source files shown below each answer
+- **Progress bar**: Shows both upload and chunking progress, with cancel/continue on page close
+- **Sidebar**: LLM/model selection, DB/model status, document/chunk count, clear all
+- **Admin dashboard**: View/delete vectorstore, see all chunks, chunk details, delete by document
+- **API Explorer**: Live API docs and testing
+- **Dark mode**: Toggle with one click
+- **Company logo**: Sidebar and AI avatar
+- **Vietnamese default answers**: Optimized for Vietnamese context
 
-### Document Processing
-- **PDF**: Uses PyMuPDF for text extraction
-- **DOCX**: Uses python-docx for document parsing
-- **TXT**: Direct text file processing
-- **Chunking**: Documents are split into manageable chunks for better retrieval
-
-### Vector Store
-- **Chroma**: Local vector database for document embeddings
-- **Embeddings**: Uses sentence-transformers for text embeddings
-- **Persistence**: Vector store is saved locally and persists between sessions
-
-### LLM Integration
-- **Gemini**: Cloud-based model with high performance
-- **Local**: Self-hosted models for privacy and offline use
-- **Context Injection**: Relevant document chunks are included in prompts
-
-### User Interface
-- **Responsive Design**: Works on desktop and mobile
-- **Dark Mode**: Toggle between light and dark themes
-- **Real-time Chat**: Instant message exchange
-- **File Management**: Visual document upload and management
-
-## Development
-
-### Project Structure
-- `main.py`: Flask application with routes
-- `backend/llm_provider.py`: LLM provider abstraction
-- `backend/document_loader.py`: Document processing utilities
-- `backend/vector_store.py`: Vector store operations
-- `templates/index.html`: Frontend interface
-
-### Adding New Features
-1. **New LLM Provider**: Extend `LLMProvider` class
-2. **New Document Type**: Add parser to `DocumentLoader`
-3. **New Vector Store**: Implement vector store interface
-4. **UI Enhancements**: Modify `templates/index.html`
+## Development & Customization
+- Add new LLM: Extend `backend/llm_provider.py`
+- Add new document type: Extend `backend/document_loader.py`
+- Change chunking/embedding: Edit `config.py` or `document_loader.py`
+- UI/UX: Edit `templates/index.html`, `static/style.css`, `static/main.js`
+- Admin/API: Edit `templates/admin.html`, `templates/api_docs.html`
 
 ## Troubleshooting
-
-### Common Issues
-
-1. **Import Errors**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. **Chroma Connection Issues**
-   - Ensure write permissions to `data/vectorstore/`
-   - Delete the directory to reset the vector store
-
-3. **Local LLM Not Responding**
-   - Check if LM Studio is running
-   - Verify the endpoint URL in `.env`
-   - Ensure the model is loaded in LM Studio
-
-4. **Gemini API Errors**
-   - Verify your API key is correct
-   - Check API quota and billing status
-
-### Logs
-The application logs errors and operations to the console. Check the terminal output for debugging information.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+- **Upload lỗi 413**: Tăng `MAX_CONTENT_LENGTH` trong Flask và proxy (Nginx/Apache)
+- **Không nhận model local**: Kiểm tra LM Studio đã chạy và endpoint đúng
+- **Gemini lỗi 404/401**: Kiểm tra API key và quota
+- **Vectorstore lỗi**: Xóa thư mục `data/vectorstore/` để reset
 
 ## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT License
 
 ## Acknowledgments
-
-- [LangChain](https://langchain.com/) for the RAG framework
+- [LangChain](https://langchain.com/) for RAG framework
 - [Chroma](https://www.trychroma.com/) for vector storage
 - [LM Studio](https://lmstudio.ai/) for local LLM hosting
-- [Google Gemini](https://ai.google.dev/) for cloud LLM access 
-
-
+- [Google Gemini](https://ai.google.dev/) for cloud LLM access
 
 ## Cách hoạt động của web app
 
